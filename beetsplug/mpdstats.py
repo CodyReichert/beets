@@ -72,6 +72,7 @@ class MPDClientWrapper(object):
         """
         host = mpd_config['host'].get(unicode)
         port = mpd_config['port'].get(int)
+        time_threshold = mpd_config['time_threshold'].get(float)
 
         if host[0] in ['/', '~']:
             host = os.path.expanduser(host)
@@ -152,7 +153,7 @@ class MPDStats(object):
 
         self.do_rating = mpd_config['rating'].get(bool)
         self.rating_mix = mpd_config['rating_mix'].get(float)
-        self.time_threshold = 10.0  # TODO: maybe add config option?
+        self.time_threshold = mpd_config['time_threshold'].get(float)
 
         self.now_playing = None
         self.mpd = MPDClientWrapper(log)
@@ -332,6 +333,7 @@ class MPDStatsPlugin(plugins.BeetsPlugin):
             'host':            u'localhost',
             'port':            6600,
             'password':        u'',
+            'time_threshold':  10.0,
         })
         mpd_config['password'].redact = True
 
