@@ -18,6 +18,7 @@
 from __future__ import (division, absolute_import, print_function,
                         unicode_literals)
 
+import os
 import pylast
 
 from beets import plugins, ui
@@ -25,25 +26,24 @@ from beets.util import mkdirall, normpath, syspath
 from beets.library import Item, Album, parse_query_string
 from beets.dbcore import OrQuery, FieldQuery
 from beets.dbcore.query import MultipleSort
-import os
 
 
 class SuggestPlugin(plugins.BeetsPlugin):
-
     def __init__(self):
         super(SuggestPlugin, self).__init__()
 
         self.config.add({
             'limit': u'5',
-            'threshold': u'0.5',
+            'threshold': 0.5,
         })
+
         self.client = pylast.LastFMNetwork(api_key=plugins.LASTFM_KEY)
 
 
     def commands(self):
         suggest_now = ui.Subcommand('suggest',
                                     help='lookup music suggestions for a beets query.'
-                                         ' $ beets suggest [query]')
+                                         ' $ beet suggest [query]')
 
         suggest_now.func = self.get_suggestions
         return [suggest_now]
@@ -56,10 +56,14 @@ class SuggestPlugin(plugins.BeetsPlugin):
 
         queries = ui.decargs(args)
         lookups = self._lookup_list(lib, queries)
+        lookups_msg = ui.colorize('text_success', (', '.join(lookups)))
 
-        self._log.info('Let\'s find artists similar to:\n{0}', (', '.join(lookups)))
+        self._log.info('Let\'s find artists similar to: {0}\n', lookups_msg)
+
         initial_matches = self.last_lookup_artist(lib, lookups)
-        self._matches_threshold_filter(lib, initial_matches)
+        final_matches = self._matches_threshold_filter(lib, initial_matches)
+
+        self._pretty_print_matches(final_matches)
 
 
     def _lookup_list(self, lib, queries):
@@ -87,8 +91,6 @@ class SuggestPlugin(plugins.BeetsPlugin):
                     r = str(match.match)
                     ss.add((m, r))
 
-        self._log.info('\n\nHere\'s some suggestions:\n')
-        print(list(ss))
         return ss
 
 
@@ -101,4 +103,27 @@ class SuggestPlugin(plugins.BeetsPlugin):
 
 
     def _matches_threshold_filter(self, lib, matches):
+        """Takes a set of artists/rating tuples returned from last.fm
+        and filters them down based off of the rating_threshold set in the
+        config.
+        """
+        final_matches = set()
+        threshold = self.config['threshold'].get(float)
+        for match in matches:
+            rating = float(match[1])
+            if rating > threshold:
+                final_matches.add(match)
+
+        return final_matches
+
+
+    def _pretty_print_matches(self, matches):
+        """Takes the final set of matched artists and pretty prints them to the
+        console.
+        """
+        for match in sorted(matches, key=lambda x: x[1], reverse=True):
+            a = str(match[0])
+            rating = "{:.0%}".format(float(match[1]))
+            pretty_rating = ui.colorize('text_warning', rating)
+            self._log.info("{0} - ({1} match)", a, pretty_rating)
         return
